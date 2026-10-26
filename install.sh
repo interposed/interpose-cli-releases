@@ -8,7 +8,7 @@
 #
 # Environment:
 #   INTERPOSE_CLI_VERSION       version tag to install (default: latest)
-#   INTERPOSE_CLI_INSTALL_DIR   install directory (default: /usr/local/bin, fallback ~/.local/bin)
+#   INTERPOSE_CLI_INSTALL_DIR   install directory (default: ~/.local/bin; the client never needs root)
 #   INTERPOSE_CLI_RELEASES_REPO override the public releases repo
 set -eu
 
@@ -68,22 +68,15 @@ if command -v sha256sum >/dev/null 2>&1 && dl "$sum_url" "$tmp/checksums.txt" 2>
 	fi
 fi
 
-# --- install ---
-dir="${INTERPOSE_CLI_INSTALL_DIR:-/usr/local/bin}"
-if [ -d "$dir" ] && [ -w "$dir" ]; then
-	mv "$tmp/$BIN" "$dir/$BIN"
-elif [ "$dir" = "/usr/local/bin" ] && command -v sudo >/dev/null 2>&1; then
-	echo "installing to $dir (needs sudo) ..."
-	sudo mv "$tmp/$BIN" "$dir/$BIN"
-else
-	dir="$HOME/.local/bin"
-	mkdir -p "$dir"
-	mv "$tmp/$BIN" "$dir/$BIN"
-fi
+# --- install (user-writable by default; the client never needs root) ---
+dir="${INTERPOSE_CLI_INSTALL_DIR:-$HOME/.local/bin}"
+mkdir -p "$dir" || err "cannot create install dir $dir"
+mv "$tmp/$BIN" "$dir/$BIN" || err "cannot write to $dir (set INTERPOSE_CLI_INSTALL_DIR to a writable dir)"
 
 echo "installed ${BIN} -> ${dir}/${BIN}"
 case ":$PATH:" in
 	*":$dir:"*) ;;
-	*) echo "note: add ${dir} to your PATH" ;;
+	*) echo "note: ${dir} is not on your PATH yet - add it:"
+	   echo "      export PATH=\"${dir}:\$PATH\"   # add to ~/.zshrc or ~/.bashrc, then restart your shell" ;;
 esac
 echo "next: interpose login"
